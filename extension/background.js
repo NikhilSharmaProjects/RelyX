@@ -144,7 +144,7 @@ function localFallbackAnalysis(url, pageScan = {}) {
     const trusted = isTrustedDomain(url);
     if (trusted) {
         score = Math.max(0, score - 35);
-        reasons.unshift("The domain is in SentinelX trusted domain list.");
+        reasons.unshift("The domain is in RelyX trusted domain list.");
     }
 
     return {
@@ -172,7 +172,7 @@ function localFallbackAnalysis(url, pageScan = {}) {
 }
 
 async function notifyProtection(title, message) {
-    console.info("SentinelX protection event:", title, message);
+    console.info("RelyX protection event:", title, message);
 }
 
 async function saveReport(tabId, report) {
@@ -189,8 +189,7 @@ function buildBlockedUrl(targetUrl, report) {
         threat: report.threat_type || "Risk detected",
         reasons: JSON.stringify((report.reasons || []).slice(0, 3)),
         explanation:
-            report.explanation ||
-            "SentinelX blocked this page for your safety.",
+            report.explanation || "RelyX blocked this page for your safety.",
     });
     return `${chrome.runtime.getURL("blocked.html")}?${query.toString()}`;
 }
@@ -203,8 +202,7 @@ async function blockNavigation(tabId, targetUrl, report, mode = "page") {
         threat_type: report.threat_type || "Risk detected",
         reasons: (report.reasons || []).slice(0, 3),
         explanation:
-            report.explanation ||
-            "SentinelX blocked this action for your safety.",
+            report.explanation || "RelyX blocked this action for your safety.",
         timestamp: new Date().toISOString(),
     };
 
@@ -213,7 +211,7 @@ async function blockNavigation(tabId, targetUrl, report, mode = "page") {
         url: buildBlockedUrl(targetUrl, report),
     });
     await notifyProtection(
-        "SentinelX blocked a threat",
+        "RelyX blocked a threat",
         "I saved you from a potentially harmful page.",
     );
 }
@@ -427,7 +425,7 @@ async function cancelUnsafeDownload(downloadItem, report) {
     };
     await setStorage({ lastDownloadAlert: alert, lastProtectionEvent: alert });
     await notifyProtection(
-        "SentinelX blocked a download",
+        "RelyX blocked a download",
         "I blocked a potentially harmful file before it could run.",
     );
 }

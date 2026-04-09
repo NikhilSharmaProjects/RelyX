@@ -1,10 +1,10 @@
 {
     "manifest_version": 3,
-    "name": "SentinelX",
+    "name": "RelyX",
     "description": "AI-powered browser security extension that detects, explains, and helps prevent online threats in real time.",
     "version": "0.2.0",
     "action": {
-        "default_title": "SentinelX",
+        "default_title": "RelyX",
         "default_popup": "popup.html"
     },
     "permissions": [

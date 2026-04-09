@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="SentinelX API", version="0.2.0")
+app = FastAPI(title="RelyX API", version="0.2.0")
 
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "sarvamai/sarvam-m")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://integrate.api.nvidia.com/v1")
@@ -163,7 +163,7 @@ def classify_url(url: str, trusted_domains: List[str]) -> dict:
 
     if trusted:
         score -= 40
-        reasons.append("Domain is in SentinelX trusted domain list.")
+        reasons.append("Domain is in RelyX trusted domain list.")
 
     if not https_enabled:
         score += 25
@@ -257,11 +257,11 @@ def select_threat_type(total_score: int, has_sensitive_inputs: bool, suspicious_
 def generate_explanation(url: str, risk_score: int, threat_type: str, reasons: List[str]) -> str:
     top_reasons = reasons[:3]
     if not top_reasons:
-        return "SentinelX did not find strong indicators of malicious behavior on this page."
+        return "RelyX did not find strong indicators of malicious behavior on this page."
 
     reason_text = " ".join(top_reasons)
     return (
-        f"SentinelX classified this page as {threat_type} with a risk score of {risk_score}/100. "
+        f"RelyX classified this page as {threat_type} with a risk score of {risk_score}/100. "
         f"Key signals: {reason_text} "
         "Avoid entering sensitive information or downloading files unless you trust the source."
     )
@@ -272,12 +272,12 @@ def fallback_plain_explanation(threat_type: str, risk_score: int, reasons: List[
     if threat_type == "Likely Safe" and risk_score <= 20:
         return (
             f"This page currently looks safe (risk {risk_score}/100). "
-            f"Signal observed: {first}. SentinelX will keep monitoring in real time."
+            f"Signal observed: {first}. RelyX will keep monitoring in real time."
         )
 
     action = "blocked" if blocked else "flagged"
     return (
-        f"SentinelX {action} this activity ({threat_type}, risk {risk_score}/100). "
+        f"RelyX {action} this activity ({threat_type}, risk {risk_score}/100). "
         f"Main reason: {first}. Avoid sharing passwords or running downloads unless you fully trust the source."
     )
 
@@ -307,7 +307,7 @@ def _llm_rewrite_final(threat_type: str, risk_score: int, reasons: List[str], bl
     rewrite_prompt = (
         "Return ONLY final user-facing text. No analysis, no planning, no markdown, no labels. "
         "Write 70-100 words in simple language for non-technical users. "
-        "Must include: what happened, why risky, what SentinelX did, and confidence level."
+        "Must include: what happened, why risky, what RelyX did, and confidence level."
     )
     context = (
         f"Target: {target}\n"
@@ -414,10 +414,10 @@ async def llm_plain_explanation(
         }
 
     system_prompt = (
-        "You are SentinelX Guardian, a cybersecurity explainer for non-technical users. "
+        "You are RelyX Guardian, a cybersecurity explainer for non-technical users. "
         "Primary objective: keep users safe with calm, clear, plain-language explanations. "
         "Rules: use everyday words, no jargon unless immediately explained, no fear-mongering, no blame. "
-        "Output format: 3 short parts in one paragraph: (1) what happened, (2) why it is risky, (3) what SentinelX did. "
+        "Output format: 3 short parts in one paragraph: (1) what happened, (2) why it is risky, (3) what RelyX did. "
         "Critical: never output your reasoning steps, planning notes, or phrases like 'the user wants' or 'I need to'. "
         "Only output the final user-facing explanation text. "
         "Always include a confidence phrase: low, medium, or high. "
@@ -506,7 +506,7 @@ def classify_download(payload: DownloadRequest, trusted_domains: List[str]) -> d
 
     if is_trusted_domain(source_domain, trusted_domains):
         risk_score = max(0, risk_score - 35)
-        reasons.insert(0, "Source domain matches SentinelX trusted list.")
+        reasons.insert(0, "Source domain matches RelyX trusted list.")
 
     risk_score = min(100, risk_score)
     should_block = risk_score >= 60

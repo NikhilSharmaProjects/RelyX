@@ -44,7 +44,7 @@ const score = Number(getParam("score") || 0);
 const target = getParam("target") || "Unknown";
 const explanation =
     safeDecode(getParam("explanation")) ||
-    "SentinelX blocked a dangerous page before it could harm you.";
+    "RelyX blocked a dangerous page before it could harm you.";
 
 setText("threatType", threat);
 setText("riskScore", `${score}/100`);

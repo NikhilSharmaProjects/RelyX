@@ -1,6 +1,6 @@
-# SentinelX Prototype
+# RelyX Prototype
 
-SentinelX is a working prototype of a Chrome Extension + FastAPI backend that detects, explains, and actively blocks browser threats in real time.
+RelyX is a working prototype of a Chrome Extension + FastAPI backend that detects, explains, and actively blocks browser threats in real time.
 
 ## Features Implemented
 
@@ -27,7 +27,7 @@ SentinelX is a working prototype of a Chrome Extension + FastAPI backend that de
 
 - Detects sensitive form inputs (`email`, `password`)
 - Blocks unsafe form submissions and risky clicks
-- Shows "SentinelX protected you" overlay for blocked actions
+- Shows "RelyX protected you" overlay for blocked actions
 
 5. AI Explanation Engine
 
@@ -127,7 +127,7 @@ Use links from `demo/index.html`:
     - Threat type
     - Simple AI explanation
     - Top reasons
-- Protection events if SentinelX blocks a page/action/download
+- Protection events if RelyX blocks a page/action/download
 - Banner appears on medium-risk pages, hard block on high risk
 
 ## API Endpoints
@@ -140,6 +140,6 @@ Use links from `demo/index.html`:
 
 ## Notes
 
-- Domain age may be unavailable for some local/dev domains; SentinelX handles this gracefully.
+- Domain age may be unavailable for some local/dev domains; RelyX handles this gracefully.
 - If backend is offline, extension falls back to local heuristic analysis.
 - Without `OPENAI_API_KEY`, explanations still work via plain-language fallback (non-LLM).

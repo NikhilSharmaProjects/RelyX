@@ -89,8 +89,8 @@ function renderReport(report) {
         : `AI status: fallback (${report.llm_error || "unknown"})`;
     aiStatusEl.style.color = aiUsed ? "#34d399" : "#f59e0b";
     const trustedLine = report.is_trusted_domain
-        ? "This site matches SentinelX trusted-domain checks."
-        : "This site is not in SentinelX trusted-domain list.";
+        ? "This site matches RelyX trusted-domain checks."
+        : "This site is not in RelyX trusted-domain list.";
     explanationEl.textContent = `${report.explanation || "No explanation provided."} ${trustedLine}`;
     renderReasons(report.reasons || []);
 }

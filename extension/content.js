@@ -77,7 +77,7 @@ function collectPageSignals() {
 }
 
 function removeExistingWarning() {
-    const existingBanner = document.getElementById("sentinelx-warning-banner");
+    const existingBanner = document.getElementById("RelyX-warning-banner");
     if (existingBanner) {
         existingBanner.remove();
     }
@@ -91,11 +91,11 @@ function markSensitiveInputs() {
     });
 
     const firstForm = document.querySelector("form");
-    if (firstForm && !document.getElementById("sentinelx-form-warning")) {
+    if (firstForm && !document.getElementById("RelyX-form-warning")) {
         const formWarning = document.createElement("div");
-        formWarning.id = "sentinelx-form-warning";
+        formWarning.id = "RelyX-form-warning";
         formWarning.textContent =
-            "SentinelX blocked sensitive actions on this page to protect your data.";
+            "RelyX blocked sensitive actions on this page to protect your data.";
         formWarning.style.background = "#fff1f0";
         formWarning.style.border = "1px solid #ffccc7";
         formWarning.style.color = "#a8071a";
@@ -110,7 +110,7 @@ function showWarningBanner(report) {
     removeExistingWarning();
 
     const banner = document.createElement("div");
-    banner.id = "sentinelx-warning-banner";
+    banner.id = "RelyX-warning-banner";
     banner.style.position = "fixed";
     banner.style.top = "0";
     banner.style.left = "0";
@@ -128,7 +128,7 @@ function showWarningBanner(report) {
         .slice(0, 3)
         .map((r) => `• ${r}`)
         .join(" ");
-    banner.textContent = `SentinelX Protection: Risk ${report.risk_score}/100 (${report.threat_type}). ${reasons}`;
+    banner.textContent = `RelyX Protection: Risk ${report.risk_score}/100 (${report.threat_type}). ${reasons}`;
 
     document.body.appendChild(banner);
     if (document.body) {
@@ -141,13 +141,13 @@ function showWarningBanner(report) {
 }
 
 function ensureActionBlockOverlay(event) {
-    const existing = document.getElementById("sentinelx-action-block-overlay");
+    const existing = document.getElementById("RelyX-action-block-overlay");
     if (existing) {
         existing.remove();
     }
 
     const overlay = document.createElement("div");
-    overlay.id = "sentinelx-action-block-overlay";
+    overlay.id = "RelyX-action-block-overlay";
     overlay.style.position = "fixed";
     overlay.style.inset = "0";
     overlay.style.background = "rgba(8, 10, 18, 0.82)";
@@ -167,7 +167,7 @@ function ensureActionBlockOverlay(event) {
     card.style.fontFamily = "Segoe UI, Tahoma, sans-serif";
 
     const heading = document.createElement("h2");
-    heading.textContent = "SentinelX protected you";
+    heading.textContent = "RelyX protected you";
     heading.style.margin = "0 0 10px";
     heading.style.fontSize = "22px";
 
