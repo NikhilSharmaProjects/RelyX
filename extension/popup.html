@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>SentinelX</title>
+        <link rel="stylesheet" href="popup.css" />
+    </head>
+    <body>
+        <main class="popup">
+            <header class="hero">
+                <h1>SentinelX</h1>
+                <p>Real-time browser threat intelligence</p>
+            </header>
+
+            <section class="card score-card">
+                <div class="score-label">Risk Score</div>
+                <div id="riskScore" class="score">--</div>
+                <div id="threatType" class="threat">Analyzing...</div>
+            </section>
+
+            <section class="card">
+                <h2>Why this might be risky</h2>
+                <p id="aiStatus" class="explanation"></p>
+                <p id="explanation" class="explanation">
+                    Run analysis on the current tab.
+                </p>
+                <ul id="reasons" class="reasons"></ul>
+            </section>
+
+            <section id="protectionCard" class="card hidden">
+                <h2>SentinelX Protection</h2>
+                <p id="protectionText" class="explanation"></p>
+            </section>
+
+            <section id="downloadAlert" class="card hidden">
+                <h2>Download Alert</h2>
+                <p id="downloadText"></p>
+            </section>
+
+            <button id="analyzeBtn" class="analyze-btn">
+                Analyze Current Tab
+            </button>
+        </main>
+
+        <script src="popup.js"></script>
+    </body>
+</html>

@@ -1,0 +1,39 @@
+{
+    "manifest_version": 3,
+    "name": "SentinelX",
+    "description": "AI-powered browser security extension that detects, explains, and helps prevent online threats in real time.",
+    "version": "0.2.0",
+    "action": {
+        "default_title": "SentinelX",
+        "default_popup": "popup.html"
+    },
+    "permissions": [
+        "activeTab",
+        "downloads",
+        "scripting",
+        "storage",
+        "tabs",
+        "webNavigation"
+    ],
+    "host_permissions": [
+        "<all_urls>",
+        "http://127.0.0.1:8000/*",
+        "http://localhost:8000/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["content.js"],
+            "run_at": "document_start"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["blocked.html", "blocked.js"],
+            "matches": ["<all_urls>"]
+        }
+    ]
+}

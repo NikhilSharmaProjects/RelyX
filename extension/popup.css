@@ -1,0 +1,130 @@
+:root {
+    --bg: #0a101f;
+    --panel: #111a31;
+    --panel-2: #17233f;
+    --text: #ecf4ff;
+    --muted: #9db2d1;
+    --accent: #22d3ee;
+    --danger: #fb7185;
+    --warn: #f59e0b;
+    --safe: #34d399;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    width: 360px;
+    min-height: 520px;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    background:
+        radial-gradient(
+            circle at 12% 8%,
+            rgba(34, 211, 238, 0.25),
+            transparent 45%
+        ),
+        radial-gradient(
+            circle at 88% 92%,
+            rgba(251, 113, 133, 0.2),
+            transparent 40%
+        ),
+        var(--bg);
+    color: var(--text);
+}
+
+.popup {
+    padding: 14px;
+}
+
+.hero {
+    margin-bottom: 12px;
+}
+
+.hero h1 {
+    margin: 0;
+    font-size: 24px;
+    letter-spacing: 0.3px;
+}
+
+.hero p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.card {
+    background: linear-gradient(170deg, var(--panel), var(--panel-2));
+    border: 1px solid rgba(157, 178, 209, 0.18);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
+}
+
+.score-card {
+    text-align: center;
+}
+
+.score-label {
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.score {
+    margin-top: 4px;
+    font-size: 42px;
+    font-weight: 700;
+}
+
+.threat {
+    font-size: 13px;
+    margin-top: 4px;
+}
+
+.card h2 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    letter-spacing: 0.2px;
+}
+
+.explanation {
+    margin: 0;
+    color: #d8e7ff;
+    font-size: 13px;
+}
+
+.reasons {
+    margin: 10px 0 0;
+    padding-left: 18px;
+}
+
+.reasons li {
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #f8fbff;
+}
+
+.analyze-btn {
+    width: 100%;
+    margin-top: 2px;
+    border: none;
+    border-radius: 12px;
+    padding: 11px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #041325;
+    background: linear-gradient(90deg, #22d3ee, #67e8f9);
+    cursor: pointer;
+}
+
+.analyze-btn:hover {
+    filter: brightness(1.04);
+}
+
+.hidden {
+    display: none;
+}
