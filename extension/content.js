@@ -12,6 +12,29 @@ const SUSPICIOUS_KEYWORDS = [
 ];
 const RISKY_DOWNLOAD_PATTERN =
     /\.(exe|msi|bat|cmd|scr|js|vbs|iso|apk|zip|rar)(\?|$)/i;
+const URGENCY_PHRASES = [
+    "act now",
+    "urgent",
+    "limited time",
+    "expires today",
+    "verify now",
+    "immediately",
+];
+const FEAR_PHRASES = [
+    "account suspended",
+    "security breach",
+    "unauthorized access",
+    "legal action",
+    "you will lose access",
+];
+const CREDENTIAL_HARVEST_PHRASES = [
+    "confirm your password",
+    "enter your password",
+    "seed phrase",
+    "wallet recovery",
+    "one-time password",
+    "otp",
+];
 
 function countOccurrences(text, word) {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -44,6 +67,70 @@ function findSensitiveInputs() {
     return document.querySelectorAll(inputSelectors.join(","));
 }
 
+function isElementHidden(element) {
+    if (!element) return false;
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return (
+        element.hidden ||
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        Number(style.opacity || 1) === 0 ||
+        rect.width === 0 ||
+        rect.height === 0
+    );
+}
+
+function buildSelector(element) {
+    if (!element || !element.tagName) return "";
+    const tag = element.tagName.toLowerCase();
+    if (element.id) {
+        return `#${element.id}`;
+    }
+    if (element.name) {
+        return `${tag}[name='${element.name}']`;
+    }
+    if (element.type) {
+        return `${tag}[type='${element.type}']`;
+    }
+    return tag;
+}
+
+function findHiddenSensitiveInputs() {
+    return Array.from(findSensitiveInputs()).filter((input) =>
+        isElementHidden(input),
+    );
+}
+
+function findExternalFormActions() {
+    const forms = Array.from(document.querySelectorAll("form[action]"));
+    const here = window.location.hostname.toLowerCase();
+    return forms.filter((form) => {
+        const action = (form.getAttribute("action") || "").trim();
+        if (!action) return false;
+        try {
+            const actionUrl = new URL(action, window.location.href);
+            const actionHost = actionUrl.hostname.toLowerCase();
+            return actionHost && actionHost !== here;
+        } catch {
+            return false;
+        }
+    });
+}
+
+function countPhraseHits(text, phrases) {
+    const lower = (text || "").toLowerCase();
+    return phrases.reduce(
+        (sum, phrase) => sum + countOccurrences(lower, phrase),
+        0,
+    );
+}
+
+function uniqueSelectors(selectors) {
+    const clean = selectors.filter(Boolean);
+    return Array.from(new Set(clean)).slice(0, 10);
+}
+
 function findSuspiciousDownloadLinks() {
     const links = Array.from(document.querySelectorAll("a[href]"));
     return links.filter((link) => RISKY_DOWNLOAD_PATTERN.test(link.href));
@@ -65,14 +152,36 @@ function collectPageSignals() {
     }
 
     const sensitiveInputs = findSensitiveInputs();
+    const hiddenSensitiveInputs = findHiddenSensitiveInputs();
+    const externalFormActions = findExternalFormActions();
     const suspiciousDownloadLinks = findSuspiciousDownloadLinks();
+    const urgencyHits = countPhraseHits(pageText, URGENCY_PHRASES);
+    const fearHits = countPhraseHits(pageText, FEAR_PHRASES);
+    const credentialHarvestHits = countPhraseHits(
+        pageText,
+        CREDENTIAL_HARVEST_PHRASES,
+    );
+
+    const highlightSelectors = uniqueSelectors([
+        ...Array.from(hiddenSensitiveInputs).map((el) => buildSelector(el)),
+        ...Array.from(externalFormActions).map((el) => buildSelector(el)),
+        ...Array.from(suspiciousDownloadLinks)
+            .slice(0, 4)
+            .map((el) => buildSelector(el)),
+    ]);
 
     return {
         page_text: pageText.slice(0, 12000),
         matched_keywords: matchedKeywords,
         keyword_hits: keywordHits,
         has_sensitive_inputs: sensitiveInputs.length > 0,
+        hidden_sensitive_inputs: hiddenSensitiveInputs.length,
+        external_form_actions: externalFormActions.length,
         suspicious_download_links: suspiciousDownloadLinks.length,
+        urgency_hits: urgencyHits,
+        fear_hits: fearHits,
+        credential_harvest_hits: credentialHarvestHits,
+        highlight_selectors: highlightSelectors,
     };
 }
 
@@ -106,6 +215,24 @@ function markSensitiveInputs() {
     }
 }
 
+function highlightTriggeredElements(report) {
+    const selectors =
+        (report && report.xai && report.xai.dom
+            ? report.xai.dom.highlight_selectors
+            : []) || [];
+
+    selectors.slice(0, 8).forEach((selector) => {
+        try {
+            const element = document.querySelector(selector);
+            if (!element) return;
+            element.style.outline = "2px solid #f59e0b";
+            element.style.boxShadow = "0 0 0 3px rgba(245,158,11,0.3)";
+        } catch {
+            // Ignore invalid selectors from dynamic pages.
+        }
+    });
+}
+
 function showWarningBanner(report) {
     removeExistingWarning();
 
@@ -128,7 +255,14 @@ function showWarningBanner(report) {
         .slice(0, 3)
         .map((r) => `• ${r}`)
         .join(" ");
-    banner.textContent = `RelyX Protection: Risk ${report.risk_score}/100 (${report.threat_type}). ${reasons}`;
+    const topSignal =
+        report && report.xai && report.xai.feature_contributions
+            ? report.xai.feature_contributions[0]
+            : null;
+    const signalLine = topSignal
+        ? ` Top signal: ${topSignal.signal} (${topSignal.impact >= 0 ? "+" : ""}${topSignal.impact}).`
+        : "";
+    banner.textContent = `RelyX Protection: Risk ${report.risk_score}/100 (${report.threat_type}). ${reasons}${signalLine}`;
 
     document.body.appendChild(banner);
     if (document.body) {
@@ -138,6 +272,7 @@ function showWarningBanner(report) {
     if (report.has_sensitive_inputs && report.risk_score >= 45) {
         markSensitiveInputs();
     }
+    highlightTriggeredElements(report);
 }
 
 function ensureActionBlockOverlay(event) {

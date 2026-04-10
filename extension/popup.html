@@ -15,7 +15,11 @@
 
             <section class="card score-card">
                 <div class="score-label">Risk Score</div>
-                <div id="riskScore" class="score">--</div>
+                <div id="riskDial" class="risk-dial" style="--dial-angle: 0deg">
+                    <div class="risk-dial-core">
+                        <div id="riskScore" class="score">--</div>
+                    </div>
+                </div>
                 <div id="threatType" class="threat">Analyzing...</div>
             </section>
 
@@ -26,6 +30,15 @@
                     Run analysis on the current tab.
                 </p>
                 <ul id="reasons" class="reasons"></ul>
+            </section>
+
+            <section id="xaiCard" class="card">
+                <h2>XAI Panel</h2>
+                <p id="xaiSummary" class="explanation">
+                    Layered defense signals will appear after analysis.
+                </p>
+                <div id="xaiBars" class="xai-bars"></div>
+                <p id="intelSummary" class="explanation intel-summary"></p>
             </section>
 
             <section id="protectionCard" class="card hidden">

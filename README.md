@@ -15,6 +15,8 @@ RelyX is a working prototype of a Chrome Extension + FastAPI backend that detect
 
 - Scans visible page text for phishing/scam patterns
 - Tracks suspicious keywords like `login`, `urgent`, `free`, `download`
+- Detects hidden sensitive fields and external form-post destinations
+- Extracts urgency/fear/credential-harvesting NLP cues for social-engineering risk
 
 3. Download Protection
 
@@ -33,6 +35,17 @@ RelyX is a working prototype of a Chrome Extension + FastAPI backend that detect
 
 - Uses LLM for simple, non-technical explanation
 - Includes top 2-3 reasons for risk decision
+
+6. Explainability (XAI) Panel
+
+- Displays top feature contributions as inline bars in popup
+- Highlights suspicious DOM elements detected during scan
+- Exposes URL features (entropy, TLD risk, punycode, URL length) used in scoring
+
+7. Threat Intel Integration (Optional)
+
+- VirusTotal URL verdict enrichment (requires API key)
+- OpenPhish feed matching support (configurable)
 
 6. Active Shield / Hard Blocking
 
@@ -67,6 +80,11 @@ $env:OPENAI_API_KEY="your_api_key_here"
 $env:OPENAI_MODEL="gpt-4o-mini"
 # Optional for OpenAI-compatible providers
 # $env:OPENAI_BASE_URL="https://api.openai.com/v1"
+
+# Optional threat-intel enrichments
+# $env:VIRUSTOTAL_API_KEY="your_virustotal_key_here"
+# $env:OPENPHISH_ENABLED="true"
+# $env:OPENPHISH_FEED_URL="https://openphish.com/feed.txt"
 
 # NVIDIA-hosted OpenAI-compatible setup (recommended for this project)
 # Either variable name works for the API key:

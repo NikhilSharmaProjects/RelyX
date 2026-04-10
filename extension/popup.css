@@ -67,6 +67,35 @@ body {
     text-align: center;
 }
 
+.risk-dial {
+    --dial-angle: 0deg;
+    width: 126px;
+    height: 126px;
+    margin: 10px auto 8px;
+    border-radius: 999px;
+    background: conic-gradient(
+        from -90deg,
+        #34d399 0deg,
+        #f59e0b 180deg,
+        #fb7185 var(--dial-angle),
+        rgba(255, 255, 255, 0.12) var(--dial-angle) 360deg
+    );
+    display: grid;
+    place-items: center;
+    transition: background 380ms ease;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+
+.risk-dial-core {
+    width: 98px;
+    height: 98px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 35% 20%, #1f2f52, #0f1830);
+    border: 1px solid rgba(157, 178, 209, 0.28);
+    display: grid;
+    place-items: center;
+}
+
 .score-label {
     color: var(--muted);
     font-size: 12px;
@@ -75,9 +104,10 @@ body {
 }
 
 .score {
-    margin-top: 4px;
-    font-size: 42px;
+    margin-top: 0;
+    font-size: 38px;
     font-weight: 700;
+    line-height: 1;
 }
 
 .threat {
@@ -106,6 +136,51 @@ body {
     margin-bottom: 6px;
     font-size: 13px;
     color: #f8fbff;
+}
+
+.xai-bars {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.xai-row {
+    display: grid;
+    gap: 4px;
+}
+
+.xai-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #dbeafe;
+}
+
+.xai-track {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(157, 178, 209, 0.2);
+    overflow: hidden;
+}
+
+.xai-bar {
+    height: 100%;
+    border-radius: inherit;
+    transition: width 280ms ease;
+}
+
+.xai-bar.positive {
+    background: linear-gradient(90deg, #fb7185, #f43f5e);
+}
+
+.xai-bar.negative {
+    background: linear-gradient(90deg, #34d399, #10b981);
+}
+
+.intel-summary {
+    margin-top: 10px;
+    color: #9db2d1;
+    font-size: 12px;
 }
 
 .analyze-btn {

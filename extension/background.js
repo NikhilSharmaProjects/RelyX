@@ -103,8 +103,17 @@ function localFallbackAnalysis(url, pageScan = {}) {
     const lowerUrl = (url || "").toLowerCase();
     const keywordHits = pageScan.keywordHits || 0;
     const hasSensitiveInputs = Boolean(pageScan.hasSensitiveInputs);
+    const hiddenSensitiveInputs = Number(pageScan.hiddenSensitiveInputs || 0);
+    const externalFormActions = Number(pageScan.externalFormActions || 0);
     const suspiciousDownloadLinks = pageScan.suspiciousDownloadLinks || 0;
+    const urgencyHits = Number(pageScan.urgencyHits || 0);
+    const fearHits = Number(pageScan.fearHits || 0);
+    const credentialHarvestHits = Number(pageScan.credentialHarvestHits || 0);
+    const highlightSelectors = Array.isArray(pageScan.highlightSelectors)
+        ? pageScan.highlightSelectors.slice(0, 10)
+        : [];
     const reasons = [];
+    const featureContributions = [];
     let score = 0;
 
     if (lowerUrl.startsWith("http://")) {
@@ -112,6 +121,12 @@ function localFallbackAnalysis(url, pageScan = {}) {
         reasons.push(
             "This page is not encrypted (HTTP). Attackers can intercept data.",
         );
+        featureContributions.push({
+            signal: "http_transport",
+            impact: 25,
+            detail: "Connection is HTTP.",
+            category: "url",
+        });
     }
 
     if (
@@ -121,23 +136,89 @@ function localFallbackAnalysis(url, pageScan = {}) {
     ) {
         score += 12;
         reasons.push("The URL uses words often seen in phishing traps.");
+        featureContributions.push({
+            signal: "phishing_lure_terms",
+            impact: 12,
+            detail: "URL includes login/verify/secure style wording.",
+            category: "url",
+        });
     }
 
     if (keywordHits > 0) {
-        score += Math.min(30, keywordHits * 3);
+        const keywordImpact = Math.min(30, keywordHits * 3);
+        score += keywordImpact;
         reasons.push(
             "The page uses urgent/security keywords to pressure users.",
         );
+        featureContributions.push({
+            signal: "keyword_language",
+            impact: keywordImpact,
+            detail: `Detected ${keywordHits} suspicious keyword hits.`,
+            category: "content",
+        });
     }
 
     if (hasSensitiveInputs) {
         score += 15;
         reasons.push("This page asks for sensitive account details.");
+        featureContributions.push({
+            signal: "sensitive_inputs",
+            impact: 15,
+            detail: "Credential/email form fields detected.",
+            category: "dom",
+        });
+    }
+
+    if (hiddenSensitiveInputs > 0) {
+        const hiddenImpact = Math.min(24, hiddenSensitiveInputs * 8);
+        score += hiddenImpact;
+        reasons.push("Hidden sensitive fields were found on this page.");
+        featureContributions.push({
+            signal: "hidden_credential_fields",
+            impact: hiddenImpact,
+            detail: `Detected ${hiddenSensitiveInputs} hidden sensitive fields.`,
+            category: "dom",
+        });
+    }
+
+    if (externalFormActions > 0) {
+        const externalImpact = Math.min(24, externalFormActions * 8);
+        score += externalImpact;
+        reasons.push("Form actions submit data to an external domain.");
+        featureContributions.push({
+            signal: "external_form_action",
+            impact: externalImpact,
+            detail: `Detected ${externalFormActions} external form action(s).`,
+            category: "dom",
+        });
     }
 
     if (suspiciousDownloadLinks > 0) {
         score += 25;
         reasons.push("This page includes risky download links.");
+        featureContributions.push({
+            signal: "suspicious_download_links",
+            impact: 25,
+            detail: `Detected ${suspiciousDownloadLinks} suspicious download links.`,
+            category: "dom",
+        });
+    }
+
+    const nlpImpact = Math.min(
+        35,
+        urgencyHits * 5 + fearHits * 6 + credentialHarvestHits * 8,
+    );
+    if (nlpImpact > 0) {
+        score += nlpImpact;
+        reasons.push(
+            "NLP language cues suggest urgency, fear, or credential-harvesting intent.",
+        );
+        featureContributions.push({
+            signal: "nlp_social_engineering",
+            impact: nlpImpact,
+            detail: `Urgency ${urgencyHits}, fear ${fearHits}, credential ${credentialHarvestHits}.`,
+            category: "nlp",
+        });
     }
 
     score = Math.min(100, score);
@@ -145,7 +226,18 @@ function localFallbackAnalysis(url, pageScan = {}) {
     if (trusted) {
         score = Math.max(0, score - 35);
         reasons.unshift("The domain is in RelyX trusted domain list.");
+        featureContributions.push({
+            signal: "trusted_domain",
+            impact: -35,
+            detail: "Trusted domain reduced final risk.",
+            category: "url",
+        });
     }
+
+    const sortedContributions = featureContributions
+        .slice()
+        .sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
+        .slice(0, 8);
 
     return {
         url,
@@ -164,8 +256,45 @@ function localFallbackAnalysis(url, pageScan = {}) {
         domain_age_days: null,
         keyword_hits: keywordHits,
         has_sensitive_inputs: hasSensitiveInputs,
+        hidden_sensitive_inputs: hiddenSensitiveInputs,
+        external_form_actions: externalFormActions,
         suspicious_download_links: suspiciousDownloadLinks,
+        urgency_hits: urgencyHits,
+        fear_hits: fearHits,
+        credential_harvest_hits: credentialHarvestHits,
         is_trusted_domain: trusted,
+        threat_intel_score: 0,
+        xai: {
+            model: "layered_rules_nlp_threat_intel",
+            feature_contributions: sortedContributions,
+            url_features: {
+                length: lowerUrl.length,
+                entropy: null,
+                tld: parseHost(url).split(".").pop() || "",
+                subdomain_depth: Math.max(
+                    0,
+                    parseHost(url).split(".").length - 2,
+                ),
+                has_punycode: parseHost(url).includes("xn--"),
+                has_ip_host: /^\d{1,3}(\.\d{1,3}){3}$/.test(parseHost(url)),
+                has_at_symbol: lowerUrl.includes("@"),
+                hyphen_count: (parseHost(url).match(/-/g) || []).length,
+            },
+            nlp: {
+                urgency_hits: urgencyHits,
+                fear_hits: fearHits,
+                credential_harvest_hits: credentialHarvestHits,
+            },
+            dom: {
+                highlight_selectors: highlightSelectors,
+                hidden_sensitive_inputs: hiddenSensitiveInputs,
+                external_form_actions: externalFormActions,
+            },
+            threat_intel: {
+                virustotal: { queried: false },
+                openphish: { queried: false },
+            },
+        },
         trusted_domains_used: TRUSTED_DOMAINS,
         source: "local-fallback",
     };
@@ -256,7 +385,13 @@ async function analyzePage(tabId, url) {
         keyword_hits: 0,
         matched_keywords: [],
         has_sensitive_inputs: false,
+        hidden_sensitive_inputs: 0,
+        external_form_actions: 0,
         suspicious_download_links: 0,
+        urgency_hits: 0,
+        fear_hits: 0,
+        credential_harvest_hits: 0,
+        highlight_selectors: [],
     };
 
     let report;
@@ -270,8 +405,14 @@ async function analyzePage(tabId, url) {
                 matched_keywords: pageScan.matched_keywords || [],
                 keyword_hits: pageScan.keyword_hits || 0,
                 has_sensitive_inputs: Boolean(pageScan.has_sensitive_inputs),
+                hidden_sensitive_inputs: pageScan.hidden_sensitive_inputs || 0,
+                external_form_actions: pageScan.external_form_actions || 0,
                 suspicious_download_links:
                     pageScan.suspicious_download_links || 0,
+                urgency_hits: pageScan.urgency_hits || 0,
+                fear_hits: pageScan.fear_hits || 0,
+                credential_harvest_hits: pageScan.credential_harvest_hits || 0,
+                highlight_selectors: pageScan.highlight_selectors || [],
                 trusted_domains: TRUSTED_DOMAINS,
             }),
         });
@@ -286,7 +427,13 @@ async function analyzePage(tabId, url) {
         report = localFallbackAnalysis(url, {
             keywordHits: pageScan.keyword_hits,
             hasSensitiveInputs: pageScan.has_sensitive_inputs,
+            hiddenSensitiveInputs: pageScan.hidden_sensitive_inputs,
+            externalFormActions: pageScan.external_form_actions,
             suspiciousDownloadLinks: pageScan.suspicious_download_links,
+            urgencyHits: pageScan.urgency_hits,
+            fearHits: pageScan.fear_hits,
+            credentialHarvestHits: pageScan.credential_harvest_hits,
+            highlightSelectors: pageScan.highlight_selectors,
         });
     }
 
