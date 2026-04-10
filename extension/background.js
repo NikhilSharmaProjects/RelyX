@@ -621,7 +621,7 @@ async function pushReportToTab(tabId, report) {
     });
 }
 
-function buildBlockedUrl(targetUrl, report, mode = "page") {
+function buildBlockedUrl(targetUrl, report, mode = "page", tabId = null) {
     const query = new URLSearchParams({
         target: targetUrl,
         score: String(report.risk_score || 0),
@@ -629,6 +629,7 @@ function buildBlockedUrl(targetUrl, report, mode = "page") {
         severity: report.severity || "high",
         confidence: report.confidence_level || "low",
         mode,
+        tab_id: tabId != null ? String(tabId) : "",
         reasons: JSON.stringify((report.reasons || []).slice(0, 3)),
         explanation:
             report.explanation ||
@@ -654,7 +655,7 @@ async function blockNavigation(tabId, targetUrl, report, mode = "page") {
 
     await setStorage({ lastProtectionEvent: event });
     await chrome.tabs.update(tabId, {
-        url: buildBlockedUrl(targetUrl, report, mode),
+        url: buildBlockedUrl(targetUrl, report, mode, tabId),
     });
 }
 

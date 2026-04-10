@@ -41,14 +41,24 @@ function renderReasons(list) {
 }
 
 async function requestOverride(targetUrl, acknowledgedDisclaimer) {
-    const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-    });
+    const tabIdFromQuery = Number(getParam("tab_id") || 0);
+    let tabId =
+        Number.isFinite(tabIdFromQuery) && tabIdFromQuery > 0
+            ? tabIdFromQuery
+            : null;
+
+    if (!tabId) {
+        const [tab] = await chrome.tabs.query({
+            active: true,
+            currentWindow: true,
+        });
+        tabId = tab && tab.id ? tab.id : null;
+    }
+
     const response = await chrome.runtime.sendMessage({
         type: "REQUEST_OVERRIDE",
         target_url: targetUrl,
-        tab_id: tab && tab.id ? tab.id : null,
+        tab_id: tabId,
         explicit: true,
         acknowledged_disclaimer: Boolean(acknowledgedDisclaimer),
     });
@@ -88,44 +98,48 @@ document.getElementById("newTabBtn")?.addEventListener("click", () => {
     chrome.tabs.create({ url: "chrome://newtab" });
 });
 
-document
-    .getElementById("overrideBtn")
-    ?.addEventListener("click", async (event) => {
-        const button = event.currentTarget;
-        if (!(button instanceof HTMLButtonElement)) return;
+function setupSuspiciousSiteContinue() {
+    document
+        .getElementById("overrideBtn")
+        ?.addEventListener("click", async (event) => {
+            const button = event.currentTarget;
+            if (!(button instanceof HTMLButtonElement)) return;
 
-        const acknowledgment = document.getElementById("responsibilityAck");
-        const hint = document.getElementById("overrideHint");
-        const isChecked =
-            acknowledgment instanceof HTMLInputElement
-                ? acknowledgment.checked
-                : false;
+            const acknowledgment = document.getElementById("responsibilityAck");
+            const hint = document.getElementById("overrideHint");
+            const isChecked =
+                acknowledgment instanceof HTMLInputElement
+                    ? acknowledgment.checked
+                    : false;
 
-        if (!isChecked) {
-            if (hint) {
-                hint.textContent =
-                    "Please confirm that RelyX is not responsible before continuing.";
+            if (!isChecked) {
+                if (hint) {
+                    hint.textContent =
+                        "Please confirm that RelyX is not responsible before continuing.";
+                }
+                return;
             }
-            return;
-        }
 
-        const userConfirmed = window.confirm(
-            "You are about to continue to a blocked site. RelyX is not responsible for further actions or consequences. Continue?",
-        );
-        if (!userConfirmed) {
-            return;
-        }
-
-        button.disabled = true;
-        button.textContent = "Applying override...";
-
-        const ok = await requestOverride(target, true);
-        if (!ok) {
-            button.disabled = false;
-            button.textContent = "Override Failed - Retry";
-            if (hint) {
-                hint.textContent =
-                    "Override failed. Please try again in a moment.";
+            const userConfirmed = window.confirm(
+                "You are about to continue to a blocked site. RelyX is not responsible for further actions or consequences. Continue?",
+            );
+            if (!userConfirmed) {
+                return;
             }
-        }
-    });
+
+            button.disabled = true;
+            button.textContent = "Applying override...";
+
+            const ok = await requestOverride(target, true);
+            if (!ok) {
+                button.disabled = false;
+                button.textContent = "Override Failed - Retry";
+                if (hint) {
+                    hint.textContent =
+                        "Override failed. Please try again in a moment.";
+                }
+            }
+        });
+}
+
+setupSuspiciousSiteContinue();
