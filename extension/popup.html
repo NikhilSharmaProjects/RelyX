@@ -7,52 +7,58 @@
         <link rel="stylesheet" href="popup.css" />
     </head>
     <body>
-        <main class="popup">
+        <main class="popup-shell">
             <header class="hero">
-                <h1>RelyX</h1>
-                <p>Real-time browser threat intelligence</p>
+                <div>
+                    <h1>RelyX Active Security</h1>
+                    <p>Real-time browser threat defense</p>
+                </div>
+                <span id="liveState" class="live-chip">Live</span>
             </header>
 
             <section class="card score-card">
-                <div class="score-label">Risk Score</div>
+                <div class="score-head">
+                    <span>Risk Score</span>
+                    <span id="severityTag" class="severity-tag">LOW</span>
+                </div>
                 <div id="riskDial" class="risk-dial" style="--dial-angle: 0deg">
                     <div class="risk-dial-core">
                         <div id="riskScore" class="score">--</div>
                     </div>
                 </div>
                 <div id="threatType" class="threat">Analyzing...</div>
+                <div id="confidenceLine" class="confidence-line">
+                    Confidence: --
+                </div>
             </section>
 
             <section class="card">
-                <h2>Why this might be risky</h2>
-                <p id="aiStatus" class="explanation"></p>
+                <h2>Threat Explanation</h2>
+                <p id="aiStatus" class="meta-line"></p>
+                <p class="meta-line">AI response</p>
                 <p id="explanation" class="explanation">
                     Run analysis on the current tab.
                 </p>
                 <ul id="reasons" class="reasons"></ul>
             </section>
 
-            <section id="xaiCard" class="card">
-                <h2>XAI Panel</h2>
-                <p id="xaiSummary" class="explanation">
-                    Layered defense signals will appear after analysis.
-                </p>
-                <div id="xaiBars" class="xai-bars"></div>
-                <p id="intelSummary" class="explanation intel-summary"></p>
+            <section class="card">
+                <h2>Threat Intelligence</h2>
+                <div id="intelGrid" class="intel-grid"></div>
             </section>
 
             <section id="protectionCard" class="card hidden">
-                <h2>RelyX Protection</h2>
+                <h2>Protection Event</h2>
                 <p id="protectionText" class="explanation"></p>
             </section>
 
             <section id="downloadAlert" class="card hidden">
-                <h2>Download Alert</h2>
-                <p id="downloadText"></p>
+                <h2>Download Guard</h2>
+                <p id="downloadText" class="explanation"></p>
             </section>
 
             <button id="analyzeBtn" class="analyze-btn">
-                Analyze Current Tab
+                Re-Analyze Current Tab
             </button>
         </main>
 

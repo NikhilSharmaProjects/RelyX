@@ -1,12 +1,13 @@
 const riskScoreEl = document.getElementById("riskScore");
 const riskDialEl = document.getElementById("riskDial");
 const threatTypeEl = document.getElementById("threatType");
+const severityTagEl = document.getElementById("severityTag");
+const confidenceLineEl = document.getElementById("confidenceLine");
+const liveStateEl = document.getElementById("liveState");
 const aiStatusEl = document.getElementById("aiStatus");
 const explanationEl = document.getElementById("explanation");
 const reasonsEl = document.getElementById("reasons");
-const xaiSummaryEl = document.getElementById("xaiSummary");
-const xaiBarsEl = document.getElementById("xaiBars");
-const intelSummaryEl = document.getElementById("intelSummary");
+const intelGridEl = document.getElementById("intelGrid");
 const analyzeBtn = document.getElementById("analyzeBtn");
 const downloadAlertEl = document.getElementById("downloadAlert");
 const downloadTextEl = document.getElementById("downloadText");
@@ -34,29 +35,22 @@ function runtimeMessage(payload) {
 }
 
 function getScoreColor(score) {
-    if (score >= 70) return "#fb7185";
-    if (score >= 45) return "#f59e0b";
-    return "#34d399";
-}
-
-function signalLabel(raw) {
-    if (!raw) return "unknown_signal";
-    return String(raw)
-        .split("_")
-        .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
-        .join(" ");
+    if (score >= 70) return "#ff7a93";
+    if (score >= 45) return "#f7a829";
+    return "#42dfb2";
 }
 
 function setDial(score) {
     if (!riskDialEl) return;
     const clamped = Math.max(0, Math.min(100, Number(score || 0)));
     riskDialEl.style.setProperty("--dial-angle", `${(clamped / 100) * 360}deg`);
+    riskDialEl.classList.toggle("high", clamped >= 70);
 }
 
 function animateScore(targetScore) {
     const target = Math.max(0, Math.min(100, Number(targetScore || 0)));
     const start = Number(riskScoreEl.dataset.score || 0);
-    const durationMs = 420;
+    const durationMs = 460;
     const startTs = performance.now();
 
     function frame(now) {
@@ -73,6 +67,25 @@ function animateScore(targetScore) {
     requestAnimationFrame(frame);
 }
 
+function setSeverityTag(severity, score) {
+    const normalized = String(severity || "low").toLowerCase();
+    severityTagEl.textContent = normalized.toUpperCase();
+    severityTagEl.classList.remove("low", "medium", "high", "critical");
+    severityTagEl.classList.add(normalized);
+
+    if (score >= 70) {
+        liveStateEl.textContent = "Shield: Blocking";
+        liveStateEl.style.borderColor = "rgba(255, 107, 134, 0.55)";
+        liveStateEl.style.background = "rgba(255, 107, 134, 0.2)";
+        liveStateEl.style.color = "#ffd4de";
+    } else {
+        liveStateEl.textContent = "Shield: Monitoring";
+        liveStateEl.style.borderColor = "rgba(49, 214, 165, 0.45)";
+        liveStateEl.style.background = "rgba(49, 214, 165, 0.2)";
+        liveStateEl.style.color = "#b7ffe7";
+    }
+}
+
 function renderReasons(reasons) {
     reasonsEl.innerHTML = "";
     (reasons || []).slice(0, 3).forEach((reason) => {
@@ -82,6 +95,85 @@ function renderReasons(reasons) {
     });
 }
 
+function renderIntelItem(label, statusText, className) {
+    const item = document.createElement("div");
+    item.className = `intel-item ${className}`;
+    item.innerHTML = `<span class="label">${label}</span><span class="status">${statusText}</span>`;
+    return item;
+}
+
+function renderThreatIntel(report) {
+    intelGridEl.innerHTML = "";
+    const checks = (report && report.api_checks) || {};
+    const gsb = checks.google_safe_browsing || {};
+    const vt = checks.virustotal || {};
+    const phishtank = checks.phishtank || {};
+    const whois = checks.whois || {};
+    const cert = checks.certificate || {};
+
+    const gsbStatus = gsb.queried
+        ? gsb.matched
+            ? "Flagged"
+            : "No match"
+        : "Unavailable";
+    intelGridEl.appendChild(
+        renderIntelItem(
+            "Google Safe Browsing",
+            gsbStatus,
+            gsb.matched ? "bad" : gsb.queried ? "good" : "warn",
+        ),
+    );
+
+    const vtStatus = vt.queried
+        ? `Mal ${vt.malicious || 0} / Susp ${vt.suspicious || 0}`
+        : "Unavailable";
+    const vtClass = vt.queried
+        ? Number(vt.malicious || 0) > 0 || Number(vt.suspicious || 0) > 0
+            ? "bad"
+            : "good"
+        : "warn";
+    intelGridEl.appendChild(renderIntelItem("VirusTotal", vtStatus, vtClass));
+
+    const ptStatus = phishtank.queried
+        ? phishtank.matched
+            ? "Phish match"
+            : "No match"
+        : "Unavailable";
+    intelGridEl.appendChild(
+        renderIntelItem(
+            "PhishTank",
+            ptStatus,
+            phishtank.matched ? "bad" : phishtank.queried ? "good" : "warn",
+        ),
+    );
+
+    const whoisStatus = whois.queried
+        ? whois.source
+            ? `Checked (${whois.source})`
+            : "Checked"
+        : "Unavailable";
+    intelGridEl.appendChild(
+        renderIntelItem(
+            "WHOIS Age",
+            whoisStatus,
+            whois.queried ? "good" : "warn",
+        ),
+    );
+
+    const certStatus = cert.queried
+        ? cert.valid === false
+            ? "Invalid"
+            : typeof cert.days_left === "number"
+              ? `${cert.days_left} days left`
+              : "Valid"
+        : "Unavailable";
+    const certClass =
+        cert.valid === false ? "bad" : cert.queried ? "good" : "warn";
+    intelGridEl.appendChild(
+        renderIntelItem("TLS Certificate", certStatus, certClass),
+    );
+}
+
 function renderDownloadAlert(alert) {
     if (!alert) {
         downloadAlertEl.classList.add("hidden");
@@ -89,63 +181,11 @@ function renderDownloadAlert(alert) {
     }
 
     downloadAlertEl.classList.remove("hidden");
-    downloadTextEl.textContent = `${alert.filename || "A file"} scored ${alert.risk_score}/100. ${alert.reasons.join(" ")}`;
-}
-
-function renderXai(report) {
-    const xai = report && report.xai ? report.xai : null;
-    xaiBarsEl.innerHTML = "";
-
-    if (!xai) {
-        xaiSummaryEl.textContent =
-            "Layered defense signals will appear after analysis.";
-        intelSummaryEl.textContent = "";
-        return;
-    }
-
-    const features = Array.isArray(xai.feature_contributions)
-        ? xai.feature_contributions.slice(0, 6)
-        : [];
-    const topFeature = features[0] || null;
-
-    xaiSummaryEl.textContent = topFeature
-        ? `${signalLabel(topFeature.signal)}: ${topFeature.detail}`
-        : "No strong feature contributions were returned.";
-
-    features.forEach((feature) => {
-        const impact = Number(feature.impact || 0);
-        const width = Math.max(10, Math.min(100, Math.abs(impact) * 2.4));
-
-        const row = document.createElement("div");
-        row.className = "xai-row";
-
-        const label = document.createElement("div");
-        label.className = "xai-label";
-        label.innerHTML = `<span>${signalLabel(feature.signal)}</span><span>${impact >= 0 ? "+" : ""}${impact}</span>`;
-
-        const track = document.createElement("div");
-        track.className = "xai-track";
-
-        const bar = document.createElement("div");
-        bar.className = `xai-bar ${impact >= 0 ? "positive" : "negative"}`;
-        bar.style.width = `${width}%`;
-
-        track.appendChild(bar);
-        row.appendChild(label);
-        row.appendChild(track);
-        xaiBarsEl.appendChild(row);
-    });
-
-    const threatIntel = xai.threat_intel || {};
-    const vt = threatIntel.virustotal || {};
-    const op = threatIntel.openphish || {};
-    const vtLine = vt.queried
-        ? `VirusTotal: malicious ${vt.malicious || 0}, suspicious ${vt.suspicious || 0}.`
-        : "VirusTotal: not configured.";
-    const opLine = op.queried
-        ? `OpenPhish: ${op.matched ? "matched known phishing feed" : "no feed match"}.`
-        : "OpenPhish: disabled.";
-    intelSummaryEl.textContent = `${vtLine} ${opLine}`;
+    downloadTextEl.textContent = `${alert.filename || "A file"} scored ${alert.risk_score}/100 (${alert.severity || "unknown"}). ${(
+        alert.reasons || []
+    )
+        .slice(0, 2)
+        .join(" ")}`;
 }
 
 function renderProtectionEvent(event) {
@@ -155,11 +195,9 @@ function renderProtectionEvent(event) {
     }
 
     protectionCardEl.classList.remove("hidden");
-    const scoreText =
-        typeof event.risk_score === "number"
-            ? `${event.risk_score}/100`
-            : "unknown";
-    protectionTextEl.textContent = `I blocked a ${event.threat_type || "risky action"} (risk ${scoreText}) to keep you safe. ${event.explanation || ""}`;
+    protectionTextEl.textContent = `RelyX blocked ${
+        event.action_kind ? `${event.action_kind} action` : "a high-risk page"
+    } (${event.risk_score || "--"}/100). ${event.explanation || "Threat stopped."}`;
 }
 
 function renderReport(report) {
@@ -168,29 +206,40 @@ function renderReport(report) {
         riskScoreEl.dataset.score = "0";
         setDial(0);
         threatTypeEl.textContent = "No data available";
+        confidenceLineEl.textContent = "Confidence: --";
         aiStatusEl.textContent = "AI status: unavailable";
         explanationEl.textContent =
             "Unable to analyze this tab. Open an HTTP/HTTPS page and try again.";
         renderReasons([]);
-        renderXai(null);
+        renderThreatIntel(null);
+        setSeverityTag("low", 0);
         return;
     }
 
     const score = Number(report.risk_score || 0);
     animateScore(score);
     riskScoreEl.style.color = getScoreColor(score);
+
     threatTypeEl.textContent = report.threat_type || "Unknown";
+    confidenceLineEl.textContent = `Confidence: ${String(
+        report.confidence_level || "low",
+    ).toUpperCase()}`;
+    setSeverityTag(report.severity || "low", score);
+
     const aiUsed = Boolean(report.llm_used);
     aiStatusEl.textContent = aiUsed
-        ? "AI status: generated by LLM"
-        : `AI status: fallback (${report.llm_error || "unknown"})`;
-    aiStatusEl.style.color = aiUsed ? "#34d399" : "#f59e0b";
-    const trustedLine = report.is_trusted_domain
-        ? "This site matches RelyX trusted-domain checks."
-        : "This site is not in RelyX trusted-domain list.";
-    explanationEl.textContent = `${report.explanation || "No explanation provided."} ${trustedLine}`;
+        ? `AI source: ${String(report.llm_provider || "ai").toUpperCase()} ${String(
+              report.llm_model || "structured explanation",
+          )}`
+        : "AI status: unavailable";
+    aiStatusEl.style.color = aiUsed ? "#8af8d5" : "#ffdca3";
+
+    explanationEl.textContent =
+        report.explanation ||
+        "RelyX analyzed this page and generated a security decision.";
+
     renderReasons(report.reasons || []);
-    renderXai(report);
+    renderThreatIntel(report);
 }
 
 async function analyzeCurrentTab(triggerAnalyze = false) {
@@ -210,17 +259,7 @@ async function analyzeCurrentTab(triggerAnalyze = false) {
 
     renderReport(result ? result.report : null);
     renderProtectionEvent(result ? result.lastProtectionEvent : null);
-
-    if (!triggerAnalyze) {
-        renderDownloadAlert(result ? result.lastDownloadAlert : null);
-    } else {
-        chrome.storage.local.get(["lastDownloadAlert"], (items) => {
-            renderDownloadAlert(items.lastDownloadAlert || null);
-        });
-        chrome.storage.local.get(["lastProtectionEvent"], (items) => {
-            renderProtectionEvent(items.lastProtectionEvent || null);
-        });
-    }
+    renderDownloadAlert(result ? result.lastDownloadAlert : null);
 }
 
 analyzeBtn.addEventListener("click", () => analyzeCurrentTab(true));

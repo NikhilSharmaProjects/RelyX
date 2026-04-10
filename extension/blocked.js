@@ -15,8 +15,7 @@ function parseReasons() {
     const encoded = getParam("reasons");
     if (!encoded) return [];
     try {
-        const decoded = safeDecode(encoded);
-        const parsed = JSON.parse(decoded);
+        const parsed = JSON.parse(safeDecode(encoded));
         return Array.isArray(parsed) ? parsed : [];
     } catch {
         return [];
@@ -24,8 +23,10 @@ function parseReasons() {
 }
 
 function setText(id, text) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = text;
+    const element = document.getElementById(id);
+    if (element) {
+        element.textContent = text;
+    }
 }
 
 function renderReasons(list) {
@@ -39,23 +40,92 @@ function renderReasons(list) {
     });
 }
 
-const threat = getParam("threat") || "Risk detected";
-const score = Number(getParam("score") || 0);
+async function requestOverride(targetUrl, acknowledgedDisclaimer) {
+    const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+    });
+    const response = await chrome.runtime.sendMessage({
+        type: "REQUEST_OVERRIDE",
+        target_url: targetUrl,
+        tab_id: tab && tab.id ? tab.id : null,
+        explicit: true,
+        acknowledged_disclaimer: Boolean(acknowledgedDisclaimer),
+    });
+    return Boolean(response && response.ok);
+}
+
+function fallbackLeave() {
+    if (window.history.length > 1) {
+        window.history.back();
+        return;
+    }
+    window.location.href = "about:blank";
+}
+
 const target = getParam("target") || "Unknown";
+const score = Number(getParam("score") || 0);
+const threat = getParam("threat") || "Threat detected";
+const severity = (getParam("severity") || "high").toUpperCase();
+const confidence = (getParam("confidence") || "low").toUpperCase();
 const explanation =
     safeDecode(getParam("explanation")) ||
-    "RelyX blocked a dangerous page before it could harm you.";
+    "RelyX blocked this destination before you could interact with a high-risk page.";
 
-setText("threatType", threat);
-setText("riskScore", `${score}/100`);
 setText("targetUrl", target);
+setText("riskScore", `${score}/100`);
+setText("threatType", threat);
+setText("severity", severity);
+setText("confidence", confidence);
 setText("plainText", explanation);
 renderReasons(parseReasons());
 
-document.getElementById("backBtn")?.addEventListener("click", () => {
-    window.history.back();
+document.getElementById("leaveBtn")?.addEventListener("click", () => {
+    fallbackLeave();
 });
 
-document.getElementById("homeBtn")?.addEventListener("click", () => {
+document.getElementById("newTabBtn")?.addEventListener("click", () => {
     chrome.tabs.create({ url: "chrome://newtab" });
 });
+
+document
+    .getElementById("overrideBtn")
+    ?.addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        if (!(button instanceof HTMLButtonElement)) return;
+
+        const acknowledgment = document.getElementById("responsibilityAck");
+        const hint = document.getElementById("overrideHint");
+        const isChecked =
+            acknowledgment instanceof HTMLInputElement
+                ? acknowledgment.checked
+                : false;
+
+        if (!isChecked) {
+            if (hint) {
+                hint.textContent =
+                    "Please confirm that RelyX is not responsible before continuing.";
+            }
+            return;
+        }
+
+        const userConfirmed = window.confirm(
+            "You are about to continue to a blocked site. RelyX is not responsible for further actions or consequences. Continue?",
+        );
+        if (!userConfirmed) {
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = "Applying override...";
+
+        const ok = await requestOverride(target, true);
+        if (!ok) {
+            button.disabled = false;
+            button.textContent = "Override Failed - Retry";
+            if (hint) {
+                hint.textContent =
+                    "Override failed. Please try again in a moment.";
+            }
+        }
+    });

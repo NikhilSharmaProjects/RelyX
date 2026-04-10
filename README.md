@@ -1,72 +1,54 @@
-# RelyX Prototype
+# RelyX Real-Time Active Security System
 
-RelyX is a working prototype of a Chrome Extension + FastAPI backend that detects, explains, and actively blocks browser threats in real time.
+RelyX is a Chrome Extension (Manifest V3) plus FastAPI backend that performs real-time multi-layer threat detection and active blocking.
 
-## Features Implemented
+## Core Security Capabilities
 
-1. URL Risk Analyzer
+- Multi-layer URL intelligence:
+    - Google Safe Browsing (phishing/malware reputation)
+    - VirusTotal (URL reputation for page and download source)
+    - PhishTank (phishing database checks)
+    - WHOIS domain age checks
+    - HTTPS and TLS certificate validation
+    - URL pattern analysis (typosquatting, punycode, IP host, lure terms, risky TLD)
 
-- Detects HTTPS status
-- Attempts domain-age lookup through WHOIS
-- Checks trusted-domain allowlist
-- Produces risk score (0-100)
+- Final deterministic risk score:
+    - Score range: 0-100
+    - Hard-block threshold: 70
+    - Download auto-block threshold: 60
+    - Form-block threshold on risky pages: 55
 
-2. Page Content Scanner
+- Real-time active blocking:
+    - Pre-navigation URL screening from service worker
+    - Full-screen threat lock overlay when risk is high
+    - Interaction lock (`pointer-events: none` on page content)
+    - Download cancellation for suspicious files
+    - Sensitive form submission blocking on unsafe pages
+    - Explicit override required to proceed (5-minute temporary host override)
 
-- Scans visible page text for phishing/scam patterns
-- Tracks suspicious keywords like `login`, `urgent`, `free`, `download`
-- Detects hidden sensitive fields and external form-post destinations
-- Extracts urgency/fear/credential-harvesting NLP cues for social-engineering risk
+- AI explanation layer (non-decision role):
+    - LLM receives structured signals and precomputed score
+    - LLM outputs deterministic JSON-only explanation fields
+    - LLM does not decide risk
+    - NVIDIA OpenAI-compatible endpoint is the default provider
 
-3. Download Protection
-
-- Monitors browser download events
-- Flags risky file types and suspicious source patterns
-- Analyzes file metadata (`mime`, size, source/referrer)
-- Auto-cancels unsafe downloads
-
-4. Data Entry Protection
-
-- Detects sensitive form inputs (`email`, `password`)
-- Blocks unsafe form submissions and risky clicks
-- Shows "RelyX protected you" overlay for blocked actions
-
-5. AI Explanation Engine
-
-- Uses LLM for simple, non-technical explanation
-- Includes top 2-3 reasons for risk decision
-
-6. Explainability (XAI) Panel
-
-- Displays top feature contributions as inline bars in popup
-- Highlights suspicious DOM elements detected during scan
-- Exposes URL features (entropy, TLD risk, punycode, URL length) used in scoring
-
-7. Threat Intel Integration (Optional)
-
-- VirusTotal URL verdict enrichment (requires API key)
-- OpenPhish feed matching support (configurable)
-
-6. Active Shield / Hard Blocking
-
-- Pre-navigation URL screening
-- Hard-blocks high-risk pages to dedicated protection page
-- Shows "I saved you from a threat" details
+- Smart fallback mode:
+    - If external APIs fail, RelyX falls back to heuristic multi-signal scoring
+    - Confidence is explicitly set to `low`
+    - Failure is never silent
 
 ## Project Structure
 
-- `extension/` Chrome extension (Manifest V3 + JS)
-- `backend/` FastAPI API for risk scoring + explanation
-- `demo/` Simulated pages: phishing, fake download, unsafe login, safe page
+- `extension/`: Chrome extension files
+- `backend/`: FastAPI threat engine
+- `demo/`: test pages for phishing, fake download, unsafe login, safe scenarios
 
 ## Prerequisites
 
 - Python 3.10+
-- Google Chrome (or Chromium-based browser)
+- Google Chrome or Chromium browser
 
-## Setup
-
-### 1) Run backend API
+## Backend Setup
 
 From `backend/`:
 
@@ -75,34 +57,28 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-# Optional but recommended for true LLM explanations
-$env:OPENAI_API_KEY="your_api_key_here"
-$env:OPENAI_MODEL="gpt-4o-mini"
-# Optional for OpenAI-compatible providers
-# $env:OPENAI_BASE_URL="https://api.openai.com/v1"
+# Required for external intelligence integrations:
+$env:GOOGLE_SAFE_BROWSING_API_KEY="YOUR_GOOGLE_SAFE_BROWSING_KEY"
+$env:VIRUSTOTAL_API_KEY="YOUR_VIRUSTOTAL_KEY"
+$env:PHISHTANK_API_KEY="YOUR_PHISHTANK_KEY"
 
-# Optional threat-intel enrichments
-# $env:VIRUSTOTAL_API_KEY="your_virustotal_key_here"
-# $env:OPENPHISH_ENABLED="true"
-# $env:OPENPHISH_FEED_URL="https://openphish.com/feed.txt"
+# Optional WHOIS API (backend will fallback to python-whois if absent):
+# $env:WHOIS_API_KEY="YOUR_WHOISXMLAPI_KEY"
+# $env:WHOIS_API_URL="https://www.whoisxmlapi.com/whoisserver/WhoisService"
 
-# NVIDIA-hosted OpenAI-compatible setup (recommended for this project)
-# Either variable name works for the API key:
-# $env:NVIDIA_API_KEY="your_nvidia_key_here"
-# or
-# $env:OPENAI_API_KEY="your_nvidia_key_here"
-# Defaults already set in code:
-# OPENAI_BASE_URL=https://integrate.api.nvidia.com/v1
-# OPENAI_MODEL=sarvamai/sarvam-m
+# Optional LLM explanation (deterministic structured output):
+# $env:NVIDIA_API_KEY="YOUR_NVIDIA_API_KEY"
+# $env:OPENAI_BASE_URL="https://integrate.api.nvidia.com/v1"
+# $env:OPENAI_MODEL="sarvamai/sarvam-m"
 
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 Health check:
 
-- Open: `http://127.0.0.1:8000/health`
+- Open `http://127.0.0.1:8000/health`
 
-### 2) Serve demo pages
+## Demo Pages
 
 From `demo/` in a second terminal:
 
@@ -114,39 +90,23 @@ Open:
 
 - `http://127.0.0.1:8081/index.html`
 
-### 3) Load extension in Chrome
+## Extension Setup
 
-1. Go to `chrome://extensions/`
-2. Enable **Developer mode**
-3. Click **Load unpacked**
-4. Select the `extension/` folder
+1. Open `chrome://extensions/`
+2. Enable Developer mode
+3. Click Load unpacked
+4. Select `extension/`
 
-## Demo Scenarios
+## Security Flow
 
-Use links from `demo/index.html`:
-
-- **Phishing simulation**: `phishing.html`
-    - Contains urgency + credential keywords and sensitive fields
-- **Fake download simulation**: `fake-download.html`
-    - Includes `.exe` download lure
-- **Unsafe login simulation**: `unsafe-login.html`
-    - Sensitive form inputs on non-trusted context
-- **Safe page**: `safe-page.html`
-    - Minimal risk indicators
-
-## How the Extension Works
-
-- Background service worker screens URLs before/while navigation
-- Content script scans page text + form/input patterns
-- Content script intercepts risky clicks and form submissions
-- Backend API scores URL/content/download and returns threat type + explanation
-- Popup displays:
-    - Risk score
-    - Threat type
-    - Simple AI explanation
-    - Top reasons
-- Protection events if RelyX blocks a page/action/download
-- Banner appears on medium-risk pages, hard block on high risk
+1. Background service worker checks URL in real time.
+2. Backend fuses API intel + WHOIS + TLS + pattern signals into score.
+3. Content script collects DOM/NLP page signals for second-pass scoring.
+4. If risk exceeds threshold:
+    - page is hard-blocked to protected view, or
+    - full-screen lock overlay is applied with interaction disabled.
+5. Downloads and sensitive forms are actively blocked on unsafe pages.
+6. User can only proceed through explicit override action.
 
 ## API Endpoints
 
@@ -156,8 +116,8 @@ Use links from `demo/index.html`:
 - `POST /explain`
 - `GET /health`
 
-## Notes
+## Important Notes
 
-- Domain age may be unavailable for some local/dev domains; RelyX handles this gracefully.
-- If backend is offline, extension falls back to local heuristic analysis.
-- Without `OPENAI_API_KEY`, explanations still work via plain-language fallback (non-LLM).
+- If threat-intel keys are missing, RelyX still runs in fallback mode but marks confidence as `low`.
+- VirusTotal checks are performed on URL reputation (not binary file scanning in-browser).
+- Domain age for private/local domains may be unavailable and is handled safely.
