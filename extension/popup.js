@@ -111,18 +111,18 @@ function renderThreatIntel(report) {
     const whois = checks.whois || {};
     const cert = checks.certificate || {};
 
-    const gsbStatus = gsb.queried
-        ? gsb.matched
-            ? "Flagged"
-            : "No match"
-        : "Unavailable";
-    intelGridEl.appendChild(
-        renderIntelItem(
-            "Google Safe Browsing",
-            gsbStatus,
-            gsb.matched ? "bad" : gsb.queried ? "good" : "warn",
-        ),
-    );
+    // const gsbStatus = gsb.queried
+    //     ? gsb.matched
+    //         ? "Flagged"
+    //         : "No match"
+    //     : "Unavailable";
+    // intelGridEl.appendChild(
+    //     renderIntelItem(
+    //         "Google Safe Browsing",
+    //         gsbStatus,
+    //         gsb.matched ? "bad" : gsb.queried ? "good" : "warn",
+    //     ),
+    // );
 
     const vtStatus = vt.queried
         ? `Mal ${vt.malicious || 0} / Susp ${vt.suspicious || 0}`
