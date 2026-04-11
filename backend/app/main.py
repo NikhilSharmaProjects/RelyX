@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 import asyncio
 import base64
+import ipaddress
 import logging
 import json
 import math
@@ -8,6 +9,7 @@ import os
 import re
 import socket
 import ssl
+import time
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from email.utils import parsedate_to_datetime
@@ -116,7 +118,7 @@ load_dotenv_flexible()
 
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://integrate.api.nvidia.com/v1").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "sarvamai/sarvam-m").strip()
-NVIDIA_API_KEY = "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"
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", os.getenv("OPENAI_API_KEY", "")).strip()
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY", "").strip()
 PHISHTANK_API_KEY = os.getenv("PHISHTANK_API_KEY", "").strip()
 WHOIS_API_KEY = os.getenv("WHOIS_API_KEY", "").strip()
@@ -135,6 +137,8 @@ LLM_API_KEY = NVIDIA_API_KEY
 LLM_LOGGER = logging.getLogger("relyx.ai")
 if not LLM_LOGGER.handlers:
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+
+_API_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 app = FastAPI(title="RelyX Active Security API", version=APP_VERSION)
 app.add_middleware(
@@ -231,6 +235,34 @@ def host_label(host: str) -> str:
 
 def is_ip_host(host: str) -> bool:
     return bool(re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", host))
+
+
+def is_public_internet_host(host: str) -> bool:
+    host = (host or "").strip().lower()
+    if not host or host in {"localhost"} or host.endswith(".local"):
+        return False
+
+    try:
+        ip = ipaddress.ip_address(host)
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved)
+    except ValueError:
+        # Non-IP hosts are considered public unless they are explicitly local-ish.
+        return True
+
+
+def cache_get(cache_key: str) -> Optional[dict[str, Any]]:
+    record = _API_CACHE.get(cache_key)
+    if not record:
+        return None
+    expires_at, value = record
+    if expires_at <= time.time():
+        _API_CACHE.pop(cache_key, None)
+        return None
+    return value.copy()
+
+
+def cache_set(cache_key: str, value: dict[str, Any], ttl_seconds: int = CACHE_TTL_SECONDS) -> None:
+    _API_CACHE[cache_key] = (time.time() + ttl_seconds, value.copy())
 
 
 def calculate_entropy(value: str) -> float:
@@ -585,6 +617,16 @@ async def check_virustotal_url(url: str) -> dict[str, Any]:
         result["error"] = "missing_virustotal_key"
         return result
 
+    host = parse_domain(url)
+    if not is_public_internet_host(host):
+        result["error"] = "skipped_non_public_host"
+        return result
+
+    cache_key = f"vt:{url}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     encoded = base64.urlsafe_b64encode(url.encode("utf-8")).decode("utf-8").strip("=")
     endpoint = f"https://www.virustotal.com/api/v3/urls/{encoded}"
 
@@ -593,8 +635,39 @@ async def check_virustotal_url(url: str) -> dict[str, Any]:
         headers = {"x-apikey": VIRUSTOTAL_API_KEY}
         async with httpx.AsyncClient(timeout=API_TIMEOUT_SECONDS) as client:
             response = await client.get(endpoint, headers=headers)
-            response.raise_for_status()
-            payload = response.json()
+            if response.status_code == 404:
+                submit_response = await client.post(
+                    "https://www.virustotal.com/api/v3/urls",
+                    data={"url": url},
+                    headers=headers,
+                )
+                submit_response.raise_for_status()
+                submit_payload = submit_response.json()
+                analysis_id = (
+                    submit_payload.get("data", {})
+                    .get("id", "")
+                )
+                if analysis_id:
+                    analysis_response = await client.get(
+                        f"https://www.virustotal.com/api/v3/analyses/{analysis_id}",
+                        headers=headers,
+                    )
+                    analysis_response.raise_for_status()
+                    payload = {
+                        "data": {
+                            "attributes": {
+                                "last_analysis_stats": analysis_response.json()
+                                .get("data", {})
+                                .get("attributes", {})
+                                .get("stats", {})
+                            }
+                        }
+                    }
+                else:
+                    payload = {"data": {"attributes": {"last_analysis_stats": {}}}}
+            else:
+                response.raise_for_status()
+                payload = response.json()
 
         stats = (
             payload.get("data", {})
@@ -605,9 +678,11 @@ async def check_virustotal_url(url: str) -> dict[str, Any]:
         result["suspicious"] = int(stats.get("suspicious", 0) or 0)
         result["harmless"] = int(stats.get("harmless", 0) or 0)
         result["undetected"] = int(stats.get("undetected", 0) or 0)
+        cache_set(cache_key, result)
         return result
     except Exception as exc:
         result["error"] = f"virustotal_failed: {str(exc)[:120]}"
+        cache_set(cache_key, result, ttl_seconds=90)
         return result
 
 
@@ -620,13 +695,25 @@ async def check_phishtank(url: str) -> dict[str, Any]:
         "error": None,
     }
 
+    if not PHISHTANK_API_KEY:
+        result["error"] = "missing_phishtank_key"
+        return result
+
+    host = parse_domain(url)
+    if not is_public_internet_host(host):
+        result["error"] = "skipped_non_public_host"
+        return result
+
+    cache_key = f"pt:{url}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     payload = {
         "url": url,
         "format": "json",
     }
-    # app_key is optional - without it, rate limits apply but API is free
-    if PHISHTANK_API_KEY:
-        payload["app_key"] = PHISHTANK_API_KEY
+    payload["app_key"] = PHISHTANK_API_KEY
 
     try:
         result["queried"] = True
@@ -636,6 +723,10 @@ async def check_phishtank(url: str) -> dict[str, Any]:
         }
         async with httpx.AsyncClient(timeout=API_TIMEOUT_SECONDS) as client:
             response = await client.post(PHISHTANK_CHECK_URL, data=payload, headers=headers)
+            if response.status_code == 403:
+                result["error"] = "phishtank_forbidden"
+                cache_set(cache_key, result, ttl_seconds=300)
+                return result
             response.raise_for_status()
             body = response.text.strip()
             data = json.loads(body)
@@ -648,9 +739,11 @@ async def check_phishtank(url: str) -> dict[str, Any]:
         result["in_database"] = in_database
         result["verified"] = verified
         result["matched"] = in_database and (verified or valid)
+        cache_set(cache_key, result)
         return result
     except Exception as exc:
         result["error"] = f"phishtank_failed: {str(exc)[:120]}"
+        cache_set(cache_key, result, ttl_seconds=120)
         return result
 
 
@@ -961,12 +1054,26 @@ def parse_llm_json_content(content: str) -> dict[str, Any]:
     except Exception:
         pass
 
-    start = text.find("{")
-    end = text.rfind("}")
-    if start != -1 and end != -1 and end > start:
-        parsed = json.loads(text[start : end + 1])
-        if isinstance(parsed, dict):
-            return parsed
+    decoder = json.JSONDecoder()
+    candidates: list[dict[str, Any]] = []
+    idx = 0
+    while idx < len(text):
+        if text[idx] != "{":
+            idx += 1
+            continue
+        try:
+            parsed, end_idx = decoder.raw_decode(text, idx)
+            if isinstance(parsed, dict):
+                candidates.append(parsed)
+            idx = max(end_idx, idx + 1)
+        except Exception:
+            idx += 1
+
+    if candidates:
+        for candidate in candidates:
+            if {"threat_type", "severity", "reasons", "summary"}.issubset(candidate.keys()):
+                return candidate
+        return max(candidates, key=lambda candidate: len(json.dumps(candidate)))
 
     raise ValueError("invalid_llm_json")
 
@@ -980,17 +1087,25 @@ def log_llm_status(message: str, **details: Any) -> None:
 
 
 def stream_nvidia_explanation(client: Any, system_prompt: str, user_payload: dict[str, Any]) -> str:
-    stream = client.chat.completions.create(
-        model=OPENAI_MODEL,
-        messages=[
+    request = {
+        "model": OPENAI_MODEL,
+        "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": json.dumps(user_payload)},
         ],
-        temperature=0.5,
-        top_p=1,
-        max_tokens=16384,
-        stream=True,
-    )
+        "temperature": 0.2,
+        "top_p": 0.9,
+        "max_tokens": 1200,
+        "stream": True,
+    }
+
+    try:
+        stream = client.chat.completions.create(
+            **request,
+            response_format={"type": "json_object"},
+        )
+    except Exception:
+        stream = client.chat.completions.create(**request)
 
     chunks: list[str] = []
     for chunk in stream:
@@ -1202,7 +1317,7 @@ def health() -> dict[str, Any]:
         "llm_model": OPENAI_MODEL,
         "google_safe_browsing_enabled": False,
         "virustotal_enabled": bool(VIRUSTOTAL_API_KEY),
-        "phishtank_enabled": True,
+        "phishtank_enabled": bool(PHISHTANK_API_KEY),
         "whois_api_enabled": bool(WHOIS_API_KEY),
     }
 
